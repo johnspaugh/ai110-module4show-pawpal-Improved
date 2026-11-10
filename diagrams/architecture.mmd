@@ -1,0 +1,33 @@
+flowchart TD
+    User([Pet owner])
+
+    subgraph UI["User interface: app.py (Streamlit)"]
+        Forms["Forms: owner, add pet, add task<br/>(validates HH:MM start time)"]
+        Session[("st.session_state<br/>keeps the Owner between reruns")]
+        Views["Views: conflict warnings, filtered task table,<br/>Complete task button, Build Schedule + Why this plan?"]
+    end
+
+    subgraph Logic["Logic layer: pawpal_system.py"]
+        Owner["Owner<br/>name, minutes per day, pets"]
+        Pet["Pet<br/>name, species, age, tasks"]
+        Task["Task<br/>title, duration, priority, frequency,<br/>start_time, due_date, completed"]
+        Scheduler["Scheduler<br/>generate_daily_plan, sort_by_time,<br/>filter_tasks, detect_conflicts, explain_plan"]
+    end
+
+    CLI["main.py<br/>terminal demo"]
+    Tests["tests/test_pawpal.py<br/>pytest checks"]
+
+    User -->|enters data, clicks buttons| Forms
+    Forms -->|add_pet, add_task| Owner
+    Session <-->|stores and reuses| Owner
+    Owner -->|has many| Pet
+    Pet -->|needs many| Task
+    Scheduler -->|plans for| Owner
+    Scheduler -->|reads pending tasks via get_all_tasks| Task
+    Views -->|builds Scheduler, calls methods| Scheduler
+    Views -->|complete_task adds next occurrence| Pet
+    Scheduler -->|plan, skipped, conflict messages, explanation| Views
+    Views -->|shows results| User
+
+    CLI -.->|uses| Logic
+    Tests -.->|verifies| Logic

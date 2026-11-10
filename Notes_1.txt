@@ -1,0 +1,27 @@
+You were missing two things. diagrams/architecture.mmd existed but was empty. There was also no assets/ folder. I wrote the diagram from your code and created assets/, which is still empty. I haven't previewed the diagram in the Live Editor, so check it renders there first.
+
+The new diagram is a flowchart that shows:
+
+UI: the Streamlit app.py — its forms, the st.session_state that keeps the Owner between reruns, and its views.
+Logic layer: pawpal_system.py — Owner, Pet, Task and Scheduler.
+Other files: main.py (terminal demo) and the tests.
+Data flow: it runs from the user through the forms and the logic back to the views.
+Your existing uml.mmd, uml_draft.mmd and uml_final.mmd are class diagrams. This one is the system-level picture, so it doesn't duplicate them.
+
+Using the Mermaid Live Editor
+A .mmd file is plain text, so you don't import anything. You copy the text between the editor and the file.
+
+Open mermaid.live.
+Copy everything in diagrams/architecture.mmd and paste it into the left "Code" pane, replacing the sample. The diagram appears on the right.
+If you edit the diagram in the browser, copy the text back into diagrams/architecture.mmd and save. The file is the required deliverable.
+Export the image: in the Actions panel, choose PNG (or SVG) and save it as assets/architecture.png.
+Embed it in your README:
+
+![PawPal+ architecture](assets/architecture.png)
+Your README currently mentions only the UML files, so you'll want to add that line.
+
+You could also open the .mmd file in VS Code with a Mermaid preview extension. The Live Editor is still the quickest way to get the PNG.
+
+I could have tried to render the PNG here with mermaid-cli, but it downloads a headless browser. I skipped that, so the export is a manual step. Want me to add the README embed line now?
+
+https://mermaid.live/edit#pako:eNp1VNtu2zgQ_ZUBnxKs7PqW2BGKLtAURRdo0QJJt0DjQqDFsUWYIrUkFUeN8-87JKMkdnb1IIrinLmcOcN7VhqBLGdrZXZlxa2H6w9Lu9RAz3eH9uTmG3owO43212k46A9du9pY3lTw_a-bJQumILVHu-Yl5sCbZth0cHLlLfJaSX-6ZL96aHg-Gls7AsY1TwEy4EJAgz59eO62b1f2zbuTW66k4B4dfPqUf_kCzodEvazx2O0VOieNvjlZMueHLu0KsvcYXW0RGwe-QvgaIsIK_Q5Rg0Xbardkpwfe_pa4C0nGNYfS6LWSpYcdt1rqjctgLRXVjClZeq0UZjHQpakbhR7Twar13ugM3rdSCbgqKxStQvgDflQdZSMdNIrrP18Ug1r8J9ufzUaWlFJcQfEObQ4N3zVcFa5zHmvi_YiUWCph4hqz07zGDGqp20BqQ0QI3mWBeneEpe4Tkt4vcK7BUiJVzze0CwUeo67pH8Gu-w566YkYEK3lXgYiGiuNlZ5iri3-06Iuu8RbbG0RWhvMsQhtz4j5xKY4bvcjk6G6p-_oZ4NUK2HJgVRdEeilxA35XnXJfTRL_StiDRSQQpS-6PtMf_COkFJH_P935_JzmIGaDIn8VDBaYpcrclmbF8BrdD4oyof1TXgXqXk9sOnCT6BayidWX84jDAbv9hgGzVHPPCduKNWte5SY26fJ6iFxEzE0UUU_WrHefdJFb_k4OfA2GDtvLAmDa0GT0dIYHRmn4QmWFXdQc93tg1L643BlhEONKPrjoIWnWH2rolXg1sHa2OOMDqzoHhFBqlrQ5CXRwa3ksEFfcKVSCw_DxLGN4FWYO_fskVgjDKWGvjKCYE8nr7G99mKEwJ4DjXd0J5Zlay0pFw9qf10b6W4rmwZF9nyD1MQ2TU-vMB3HYp-ivk7BVYa-qCOt8pRs0MGR_GAwJLvUqXg1HAgund6ilWt5YMEytrFSsNzbFjNWk2p52LL7gCaZVljjkuX0SZdcezcQ3G4HpVHGLtlSPxC-4fqnMXXvwpp2U7F8zZWjXduE-f0gOV1ezybUQ7SXptWe5eOzi-iD5ffsjrYXi-H5YrKYTc7OF7PFdDrJWMfy6Wg4W8wn09FkTKfj8Wj-kLHfMexoOD-fnU0vxuez6Wg2n07nD_8C7OZRpw

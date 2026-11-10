@@ -1,0 +1,217 @@
+NOTES 2: PawPal+ AI FEATURES PLAN
+Features: Retrieval-Augmented Generation (RAG) + Agentic Workflow
+=====================================================================
+
+GOAL
+----
+PawPal+ already schedules tasks with plain Python (Owner -> Pet -> Task,
+Scheduler). The AI part should make it do something it cannot do today:
+turn a plain-English request into a checked, explained care plan, using real
+pet-care guidance instead of whatever the model remembers.
+
+Requirement reminders from the instructions:
+  - Pick at least one advanced feature (I am doing two: RAG and Agentic).
+  - The feature must change how the system behaves, not sit beside it. For
+    RAG, the retrieved text has to shape the answer, not just be printed.
+  - Must run reproducibly, log what it does, handle errors safely, and have
+    clear setup steps.
+
+THE IDEA IN ONE PARAGRAPH
+-------------------------
+The user types something like: "I have 90 minutes a day. I have a senior
+dog, Biscuit, and a cat, Mochi. Biscuit takes arthritis medicine." A planning
+agent breaks that into steps. It looks up care guidance for each pet
+(RAG), proposes tasks with durations and priorities, adds them through the
+existing Owner/Pet/Task classes, runs the existing Scheduler, checks the
+result (time budget, conflicts, anything essential left out), and fixes
+problems before showing the final plan with a "why" that cites the guidance
+it used.
+
+HOW THE TWO FEATURES FIT TOGETHER
+---------------------------------
+RAG is a tool the agent can call. The agent is the loop that decides when to
+call it. So it is one pipeline, not two separate demos:
+
+   user request
+        |
+        v
+   [1 PLAN]   agent lists what it needs (pets, medicines, time limit)
+        |
+        v
+   [2 RETRIEVE] RAG looks up guidance for each pet's species/age/needs
+        |
+        v
+   [3 ACT]    agent calls existing code: add_pet, add_task,
+              generate_daily_plan, detect_conflicts
+        |
+        v
+   [4 CHECK]  agent tests its own result:
+                - minutes used <= minutes available?
+                - any conflicts?
+                - any essential task skipped (meds, feeding)?
+        |
+        +-- problems found --> revise tasks, go back to 3 (max N tries)
+        |
+        v
+   [5 EXPLAIN] final plan + reasons, citing the retrieved guidance
+
+-------------------------------------------------------------------------
+PART A: RETRIEVAL-AUGMENTED GENERATION (RAG)
+-------------------------------------------------------------------------
+
+What the AI looks up
+  A small knowledge base of pet-care guidance, stored as plain text files,
+  for example:
+      knowledge/dog_care.md
+      knowledge/cat_care.md
+      knowledge/senior_pets.md
+      knowledge/medication_basics.md
+  Each file is split into short chunks (a paragraph or a bullet group), each
+  with a source name so it can be cited.
+  Content should be written by me or taken from clearly licensed sources,
+  and kept general (typical walk lengths, feeding frequency, grooming
+  frequency). Add a note that this is general guidance, not vet advice.
+
+How retrieval works (keep it simple)
+  - Start with keyword scoring (TF-IDF or simple word overlap). No vector
+    database needed, which keeps setup easy and results reproducible.
+  - Query is built from the pet: species + age + any condition mentioned
+    ("senior dog arthritis medicine").
+  - Return the top 3 chunks with their source names.
+  - Stretch: swap in embeddings later and compare results.
+
+How the retrieved text actually changes behavior (important for grading)
+  1. Task suggestions: the model is told to build tasks ONLY from the
+     retrieved chunks. Durations and priorities come from that text. If a
+     senior dog's guidance says "two shorter walks", the plan has two
+     shorter walks, not one long one.
+  2. Plan checking: guidance marks some tasks as essential (meds, feeding).
+     If the Scheduler skips one because of the time budget, the agent flags
+     it instead of silently dropping it.
+  3. Explanations: the "Why this plan?" text cites the source chunk for
+     each AI-suggested task, e.g. "20 min walk (source: dog_care.md)".
+  4. If nothing relevant is retrieved, the system says it has no guidance
+     for that pet and falls back to asking the user, instead of guessing.
+
+Where it plugs into the existing code
+  - New module, e.g. rag.py: load_knowledge(), retrieve(query, k).
+  - app.py: after "Add a Pet", an optional "Suggest tasks" button that uses
+    retrieval and shows suggestions the user can accept.
+  - Scheduler.explain_plan() gains an optional "sources" field per task.
+
+-------------------------------------------------------------------------
+PART B: AGENTIC WORKFLOW
+-------------------------------------------------------------------------
+
+What "plan, act, check" means here
+  PLAN   Break the request into steps (which pets, what needs lookup).
+  ACT    Call tools. The tools are thin wrappers over code that already
+         exists, so the agent cannot invent new behavior:
+            retrieve_guidance(query)      -> RAG
+            add_pet(name, species, age)
+            add_task(pet, title, minutes, priority, frequency, start_time)
+            generate_daily_plan()
+            detect_conflicts()
+  CHECK  After acting, test the work:
+            - total planned minutes vs available_minutes_per_day
+            - detect_conflicts() returns an empty list
+            - every "essential" task is in the plan, not in skipped
+         If a check fails, adjust (shorten a task, change a start time,
+         drop a low-priority task) and run again.
+
+Guardrails
+  - Maximum number of loop iterations (for example 3) so it cannot run
+    forever or burn through API credit.
+  - The model's output must match a fixed format (JSON with required
+    fields). Validate it before touching any Owner/Pet/Task object. Reject
+    bad priorities, negative minutes, start times not matching HH:MM
+    (the same rule app.py already uses).
+  - The agent may only call the listed tools, nothing else.
+  - Show the user the proposed plan before it is saved; user accepts or
+    rejects.
+  - If the AI call fails or there is no API key, fall back to the current
+    non-AI behavior and say so clearly. The app must never crash on this.
+
+Logging
+  - Python logging module, to the console and to pawpal.log.
+  - One log line per step: what the agent decided, which tool it called with
+    which arguments, what the check found, and why it retried.
+  - Log retrieval results (query, sources returned, scores) so a wrong
+    answer can be traced to a wrong chunk.
+  - Never log the API key.
+
+-------------------------------------------------------------------------
+MODEL / SETUP DECISIONS
+-------------------------------------------------------------------------
+  - Use the Anthropic Python SDK. Good starting model: a Sonnet or Haiku
+    model (Haiku is cheaper for development). Confirm the current model ID in
+    the Anthropic docs before coding, and put it in one config constant.
+  - API key via environment variable (ANTHROPIC_API_KEY), loaded from a
+    local .env file that is in .gitignore. Never commit the key.
+  - requirements.txt gets: anthropic, python-dotenv (and scikit-learn only if
+    TF-IDF is used).
+  - README setup steps to write:
+        1. python -m venv .venv and activate it
+        2. pip install -r requirements.txt
+        3. copy .env.example to .env and add the key
+        4. streamlit run app.py
+        5. pytest
+  - Provide a "demo mode" that uses canned model replies so the app can be
+    run and graded without an API key. This also makes tests repeatable.
+
+-------------------------------------------------------------------------
+TESTING (supports the "runs correctly and reproducibly" requirement)
+-------------------------------------------------------------------------
+  - Unit tests for retrieval: a query about "senior dog" returns the senior
+    pet chunk; a query about something unrelated returns nothing or low
+    score.
+  - Unit tests for validation: a malformed model reply is rejected without
+    changing the owner.
+  - Agent loop test with a fake model: first reply overbooks the day, the
+    check catches it, second reply fits. Assert the loop stopped on the
+    second try.
+  - Max-iteration test: a fake model that never fixes the problem stops at
+    the limit and reports it.
+  - Existing tests in tests/test_pawpal.py must keep passing.
+  - Manual check list: a few sample requests with expected results, saved in
+    the README.
+
+-------------------------------------------------------------------------
+BUILD ORDER
+-------------------------------------------------------------------------
+  1. Write the knowledge files (small, 4 to 6 files).
+  2. rag.py: load, chunk, retrieve, with tests. Print results in a script
+     first, only to check quality.
+  3. Tool wrappers over Owner/Pet/Task/Scheduler (no AI yet) with tests.
+  4. Model call with strict JSON output + validation + fallback.
+  5. Agent loop (plan, act, check, retry) with logging.
+  6. Hook into app.py: request box, proposed plan preview, accept button,
+     "Why this plan?" with sources.
+  7. Demo mode, README setup steps, .env.example, update the architecture
+     diagram (diagrams/architecture.mmd) to include rag.py, the agent and
+     the model call.
+  8. Reflection: what retrieval got wrong, what the agent fixed or failed to
+     fix, limits.
+
+-------------------------------------------------------------------------
+RISKS AND LIMITS TO WRITE DOWN
+-------------------------------------------------------------------------
+  - Guidance is general; this is not veterinary advice. Medicine timing and
+    doses must always come from the owner or vet, never from the model.
+  - A small knowledge base means retrieval can miss; the system should say
+    "no guidance found" rather than invent something.
+  - The agent can still produce a plan that passes its checks but is
+    unrealistic (the checks only test what I coded).
+  - Model output varies between runs; tests use a fake model to stay
+    repeatable.
+  - Cost and latency per request; the iteration limit helps.
+
+OPEN QUESTIONS (decide before coding)
+-------------------------------------
+  - Which pets and conditions should the knowledge base cover? (Dog, cat,
+    "other"; senior and puppy/kitten?)
+  - Keyword retrieval only, or try embeddings as a stretch?
+  - Should the agent be allowed to change tasks the user already added, or
+    only add new ones? (Safer: add only, user edits the rest.)
+  - Is demo mode with canned replies acceptable for grading, or must the
+    live model run?
