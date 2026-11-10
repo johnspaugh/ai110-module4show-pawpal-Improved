@@ -1,33 +1,80 @@
 flowchart TD
+    %% Legend: solid boxes exist today, dashed boxes are planned (see Notes_2.txt)
+
     User([Pet owner])
 
-    subgraph UI["User interface: app.py (Streamlit)"]
-        Forms["Forms: owner, add pet, add task<br/>(validates HH:MM start time)"]
-        Session[("st.session_state<br/>keeps the Owner between reruns")]
-        Views["Views: conflict warnings, filtered task table,<br/>Complete task button, Build Schedule + Why this plan?"]
+    subgraph INPUT["INPUT"]
+        Request["Plain-English request<br/>e.g. 90 min, senior dog + cat"]
+        Forms["Streamlit forms: owner, pet, task<br/>validates HH:MM start time<br/>(app.py)"]
     end
 
-    subgraph Logic["Logic layer: pawpal_system.py"]
-        Owner["Owner<br/>name, minutes per day, pets"]
-        Pet["Pet<br/>name, species, age, tasks"]
-        Task["Task<br/>title, duration, priority, frequency,<br/>start_time, due_date, completed"]
-        Scheduler["Scheduler<br/>generate_daily_plan, sort_by_time,<br/>filter_tasks, detect_conflicts, explain_plan"]
+    subgraph PROCESS["PROCESS"]
+        direction TB
+        Agent["Planning agent<br/>plan, act, check, retry (max N)"]
+        Retriever["Retriever (RAG)<br/>keyword search over care guides"]
+        KB[("Knowledge base<br/>dog, cat, senior pet, medication<br/>text files")]
+        LLM["LLM call<br/>strict JSON output"]
+        Validator["Output validator<br/>schema, priority, minutes, HH:MM"]
+
+        subgraph CORE["Core logic (pawpal_system.py)"]
+            Owner["Owner"]
+            Pet["Pet"]
+            Task["Task"]
+            Scheduler["Scheduler<br/>generate_daily_plan, detect_conflicts,<br/>sort_by_time, filter_tasks"]
+        end
+
+        Evaluator["Evaluator (self-check)<br/>time budget, conflicts,<br/>essential tasks not skipped"]
+        Log[("pawpal.log<br/>every step, tool call, retry")]
     end
 
-    CLI["main.py<br/>terminal demo"]
-    Tests["tests/test_pawpal.py<br/>pytest checks"]
+    subgraph OUTPUT["OUTPUT"]
+        Preview["Proposed plan preview<br/>+ conflict warnings<br/>+ Why this plan? with cited sources"]
+        Saved["Saved plan in<br/>st.session_state"]
+    end
 
-    User -->|enters data, clicks buttons| Forms
+    subgraph CHECKS["HUMAN AND TEST CHECKS"]
+        Human{{"Human review<br/>owner accepts or rejects"}}
+        Tests["Automated tests (pytest)<br/>retrieval, validation,<br/>agent loop with a fake model"]
+        Fallback["Fallback: non-AI scheduling<br/>if no API key or model error"]
+    end
+
+    User --> Request
+    User --> Forms
     Forms -->|add_pet, add_task| Owner
-    Session <-->|stores and reuses| Owner
+    Request --> Agent
+
+    Agent -->|1. look up guidance| Retriever
+    Retriever <-->|top 3 chunks + source names| KB
+    Retriever -->|retrieved text| Agent
+    Agent -->|2. prompt + retrieved text| LLM
+    LLM -->|proposed tasks| Validator
+    Validator -->|valid tasks only| Agent
+    Validator -.->|invalid: reject and retry| Agent
+    Agent -->|3. add_pet, add_task| Owner
     Owner -->|has many| Pet
     Pet -->|needs many| Task
-    Scheduler -->|plans for| Owner
-    Scheduler -->|reads pending tasks via get_all_tasks| Task
-    Views -->|builds Scheduler, calls methods| Scheduler
-    Views -->|complete_task adds next occurrence| Pet
-    Scheduler -->|plan, skipped, conflict messages, explanation| Views
-    Views -->|shows results| User
+    Agent -->|4. generate_daily_plan| Scheduler
+    Scheduler -->|reads tasks| Owner
+    Scheduler -->|plan, skipped, conflicts| Evaluator
+    Evaluator -->|problems found: revise| Agent
+    Evaluator -->|checks pass| Preview
 
-    CLI -.->|uses| Logic
-    Tests -.->|verifies| Logic
+    Agent -.-> Log
+    Retriever -.-> Log
+    Evaluator -.-> Log
+
+    Preview --> Human
+    Human -->|accept| Saved
+    Human -->|reject| Request
+    Saved --> User
+
+    LLM -.->|error or no key| Fallback
+    Fallback --> Scheduler
+
+    Tests -.->|verifies| Retriever
+    Tests -.->|verifies| Validator
+    Tests -.->|verifies| Agent
+    Tests -.->|verifies| Scheduler
+
+    classDef planned stroke-dasharray: 5 5
+    class Agent,Retriever,KB,LLM,Validator,Evaluator,Log,Fallback planned
