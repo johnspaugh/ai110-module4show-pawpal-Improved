@@ -1,7 +1,12 @@
 import re
 
 import streamlit as st
+from agent import PlanningAgent, commit_proposal, confidence_label
+from llm import get_llm
+from logging_setup import setup_logging
 from pawpal_system import Owner, Pet, Task, Scheduler
+
+setup_logging()
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -9,35 +14,11 @@ st.title("🐾 PawPal+")
 
 st.markdown(
     """
-Welcome to the PawPal+ starter app.
-
-This file is intentionally thin. It gives you a working Streamlit app so you can start quickly,
-but **it does not implement the project logic**. Your job is to design the system and build it.
-
-Use this app as your interactive demo once your backend classes/functions exist.
+PawPal+ plans a pet owner's day: it fits care tasks for all of your pets into your
+time budget, warns about overlaps, repeats recurring tasks, and can suggest tasks
+from pet-care guidance with an AI assistant that checks its own work.
 """
 )
-
-with st.expander("Scenario", expanded=True):
-    st.markdown(
-        """
-**PawPal+** is a pet care planning assistant. It helps a pet owner plan care tasks
-for their pet(s) based on constraints like time, priority, and preferences.
-
-You will design and implement the scheduling logic and connect it to this Streamlit UI.
-"""
-    )
-
-with st.expander("What you need to build", expanded=True):
-    st.markdown(
-        """
-At minimum, your system should:
-- Represent pet care tasks (what needs to happen, how long it takes, priority)
-- Represent the pet and the owner (basic info and preferences)
-- Build a plan/schedule for a day that chooses and orders tasks based on constraints
-- Explain the plan (why each task was chosen and when it happens)
-"""
-    )
 
 st.divider()
 
@@ -60,8 +41,14 @@ with st.form("add_pet_form", clear_on_submit=True):
     species = st.selectbox("Species", ["dog", "cat", "other"])
     age = st.number_input("Age", min_value=0, max_value=40, value=1)
     if st.form_submit_button("Add pet"):
-        owner.add_pet(Pet(name=pet_name, species=species, age=int(age)))
-        st.success(f"Added {pet_name}!")
+        clean_name = pet_name.strip()
+        if not clean_name:
+            st.error("Give your pet a name.")
+        elif any(p.name.strip().lower() == clean_name.lower() for p in owner.pets):
+            st.error(f"You already have a pet named {clean_name}. Use a different name.")
+        else:
+            owner.add_pet(Pet(name=clean_name, species=species, age=int(age)))
+            st.success(f"Added {clean_name}!")
 
 if owner.pets:
     st.write("Your pets:")
@@ -161,6 +148,91 @@ if owner.pets:
         st.info("No tasks yet. Add one above.")
 else:
     st.caption("Add a pet first, then you can add tasks for it.")
+
+st.divider()
+
+st.subheader("AI Plan Assistant")
+if "llm" not in st.session_state:
+    st.session_state.llm = get_llm()
+llm = st.session_state.llm
+if llm.mode == "live":
+    st.caption(f"Live model: {llm.model}. Suggestions come from retrieved pet-care guidance.")
+else:
+    st.caption(
+        "Demo mode (no ANTHROPIC_API_KEY set): a rule-based stand-in reads the same "
+        "retrieved guidance. Add a key to use the live model."
+    )
+
+if st.session_state.get("flash"):
+    st.success(st.session_state.pop("flash"))
+
+notes = st.text_area(
+    "Notes for the assistant (optional)",
+    placeholder="e.g. Biscuit takes arthritis medicine every morning. Keep walks gentle.",
+)
+if st.button("Generate AI plan", disabled=not owner.pets):
+    with st.spinner("Retrieving guidance, proposing tasks and checking the result..."):
+        st.session_state.proposal = PlanningAgent(owner, llm).run(notes)
+
+proposal = st.session_state.get("proposal")
+if proposal:
+    if proposal.used_fallback:
+        for message in proposal.problems:
+            st.warning(message)
+    elif not proposal.tasks:
+        for message in proposal.problems or ["The assistant had no suggestions."]:
+            st.warning(message)
+    else:
+        if proposal.converged:
+            st.success(
+                f"Proposed {len(proposal.tasks)} task(s) after {proposal.iterations} attempt(s). "
+                "The agent's own checks passed: time budget, essential tasks, no overlaps."
+            )
+            st.caption(f"Confidence: {proposal.confidence:.2f} "
+                       f"({confidence_label(proposal.confidence)}). A heuristic from retries "
+                       "and missing guidance, not the model rating itself.")
+        else:
+            st.warning(
+                f"Proposed {len(proposal.tasks)} task(s), but the checks still found "
+                f"problems after {proposal.iterations} attempt(s). Review them before accepting."
+            )
+            for message in proposal.problems:
+                # Drop the internal code ("SKIPPED_ESSENTIAL: ") and show the readable part.
+                st.warning(message.split(": ", 1)[-1], icon="⚠️")
+            st.caption(f"Confidence: {proposal.confidence:.2f} "
+                       f"({confidence_label(proposal.confidence)}), capped because the "
+                       "checks did not pass.")
+        st.table([{
+            "pet": t.pet, "task": t.title, "start": t.start_time or "unscheduled",
+            "minutes": t.duration_minutes, "priority": t.priority,
+            "essential": "yes" if t.essential else "", "source": t.source,
+        } for t in proposal.tasks])
+        if proposal.skipped:
+            st.info("Would not fit in the day: " + ", ".join(
+                f"{t.pet_name}'s {t.title} ({t.duration_minutes} min)" for t in proposal.skipped))
+        accept_col, reject_col = st.columns(2)
+        with accept_col:
+            if st.button("Accept and add these tasks"):
+                added = commit_proposal(owner, proposal)
+                st.session_state.pop("proposal", None)
+                st.session_state.flash = f"Added {len(added)} task(s) to your pets."
+                st.rerun()
+        with reject_col:
+            if st.button("Reject"):
+                st.session_state.pop("proposal", None)
+                st.rerun()
+    if proposal.no_guidance:
+        st.info("No guidance found for: " + ", ".join(proposal.no_guidance)
+                + ". No tasks were suggested for them.")
+    with st.expander("What the agent did"):
+        st.text("\n".join(proposal.trace))
+    with st.expander("Retrieved guidance"):
+        for pet_name, hits in proposal.guidance.items():
+            st.write(f"**{pet_name}:** " + (", ".join(f"{label} (score {score})"
+                                                     for label, score in hits) or "nothing found"))
+    if proposal.explanation:
+        with st.expander("Why this plan? (in plain language)"):
+            st.text(proposal.explanation)
 
 st.divider()
 

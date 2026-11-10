@@ -5,9 +5,10 @@ Backend classes for the pet care planner, matching diagrams/uml_draft.mmd:
 Task, Pet, Owner and Scheduler.
 """
 
+import re
 from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 # Lets the scheduler sort priority strings; higher number = more important.
@@ -15,6 +16,9 @@ PRIORITY_ORDER = {"low": 1, "medium": 2, "high": 3}
 
 # Days until the next occurrence of a recurring task; "once" never repeats.
 RECURRENCE_DAYS = {"daily": 1, "weekly": 7, "monthly": 30}
+
+
+_HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
 
 def _to_minutes(hhmm: str) -> int:
@@ -36,13 +40,27 @@ class Task:
     pet_name: str = ""  # filled in by Pet.add_task so a plan can say "Walk Biscuit"
     start_time: str = ""  # "HH:MM" (24h); empty means unscheduled
     due_date: Optional[date] = None
+    source: str = ""  # guidance chunk an AI suggestion came from, e.g. "dog_care.md: Senior dogs"
+    essential: bool = False  # True for tasks the plan must not drop (meds, feeding)
+
+    def __post_init__(self) -> None:
+        """Reject values that would break scheduling (bad start time, negative duration)."""
+        if self.start_time and not _HHMM.fullmatch(self.start_time):
+            raise ValueError(
+                f"start_time must look like 08:30 (24-hour HH:MM), got {self.start_time!r}"
+            )
+        if self.duration_minutes < 0:
+            raise ValueError(f"duration_minutes cannot be negative, got {self.duration_minutes}")
 
     @property
     def end_time(self) -> str:
-        """Return "HH:MM" for when this task finishes, or "" if it has no start time."""
+        """Return "HH:MM" for when this task finishes, or "" if it has no start time.
+
+        A task that runs past midnight wraps around (23:30 + 90 min is "01:00").
+        """
         if not self.start_time:
             return ""
-        end = _to_minutes(self.start_time) + self.duration_minutes
+        end = (_to_minutes(self.start_time) + self.duration_minutes) % (24 * 60)
         return f"{end // 60:02d}:{end % 60:02d}"
 
     def mark_complete(self) -> Optional["Task"]:
@@ -180,32 +198,90 @@ class Scheduler:
             and (completed is None or t.completed == completed)
         ]
 
-    def detect_conflicts(self) -> List[str]:
-        """Return a warning message for each pair of overlapping pending tasks.
+    def conflicting_pairs(self) -> List[Tuple[Task, Task]]:
+        """Return each pair (earlier, later) of overlapping pending timed tasks.
 
-        Only tasks with a start_time are checked, for the same pet or different
-        pets. Two tasks overlap when one starts before the other ends; a task
-        that starts exactly when another ends is not a conflict. Never raises
-        for overlaps, so the caller can just print the messages. An empty list
-        means no conflicts.
+        Two tasks overlap when one starts before the other ends; a task that
+        starts exactly when another ends is not a conflict.
         """
         timed = self.sort_by_time(
             [t for t in self.filter_tasks(completed=False) if t.start_time]
         )
-        warnings: List[str] = []
+        pairs: List[Tuple[Task, Task]] = []
         # Sorted by start, so a task can only overlap tasks that start before it ends.
         for i, a in enumerate(timed):
             a_end = _to_minutes(a.start_time) + a.duration_minutes
             for b in timed[i + 1:]:
                 if _to_minutes(b.start_time) >= a_end:
                     break
-                same = "same pet" if a.pet_name == b.pet_name else "different pets"
-                warnings.append(
-                    f"Conflict ({same}): {a.pet_name}'s {a.title} "
-                    f"({a.start_time}-{a.end_time}) overlaps {b.pet_name}'s "
-                    f"{b.title} ({b.start_time}-{b.end_time})"
-                )
+                pairs.append((a, b))
+        return pairs
+
+    def detect_conflicts(self) -> List[str]:
+        """Return a warning message for each pair of overlapping pending tasks.
+
+        Only tasks with a start_time are checked, for the same pet or different
+        pets. Never raises for overlaps, so the caller can just print the
+        messages. An empty list means no conflicts.
+        """
+        warnings: List[str] = []
+        for a, b in self.conflicting_pairs():
+            same = "same pet" if a.pet_name == b.pet_name else "different pets"
+            warnings.append(
+                f"Conflict ({same}): {a.pet_name}'s {a.title} "
+                f"({a.start_time}-{a.end_time}) overlaps {b.pet_name}'s "
+                f"{b.title} ({b.start_time}-{b.end_time})"
+            )
         return warnings
+
+    def explain_schedule(self, source_notes: Optional[Dict[str, str]] = None) -> str:
+        """Plain-language explanation of the last plan, for someone who did not build it.
+
+        Lists the planned tasks in time order (unscheduled ones last) with the
+        reason each is there. source_notes maps a guidance label (for example
+        "dog_care.md: Senior dogs") to a one-sentence plain-language note; each
+        cited label becomes a numbered footnote quoting that note.
+        """
+        source_notes = source_notes or {}
+        budget = self.owner.available_minutes_per_day
+        used = sum(t.duration_minutes for t in self.plan)
+        lines = [
+            f"Plan for {self.owner.name}: {used} of {budget} minutes used.",
+            "The list is in time order. Tasks were chosen by priority (high first), "
+            "then shortest first, and added while they still fit in the day.",
+            "",
+        ]
+
+        footnotes: Dict[str, int] = {}
+        for task in self.sort_by_time(self.plan):
+            when = f"{task.start_time}-{task.end_time}" if task.start_time else "any time"
+            lines.append(f"{when}  {task.pet_name}: {task.title} ({task.duration_minutes} min)")
+            reasons = [f"{task.priority} priority"]
+            if task.essential:
+                reasons.append("essential, so it should not be skipped")
+            if task.source:
+                number = footnotes.setdefault(task.source, len(footnotes) + 1)
+                reasons.append(f"suggested by guide [{number}]")
+            else:
+                reasons.append("a task you added yourself")
+            lines.append("    Why: " + "; ".join(reasons))
+
+        if footnotes:
+            lines.append("")
+            lines.append("What the guides say:")
+            for label, number in footnotes.items():
+                note = source_notes.get(label, "")
+                lines.append(f"  [{number}] {label}" + (f': "{note}"' if note else ""))
+
+        if self.skipped:
+            lines.append("")
+            lines.append("Left out because there was not enough time left:")
+            for task in self.skipped:
+                lines.append(
+                    f"  - {task.pet_name}: {task.title} "
+                    f"({task.duration_minutes} min, {task.priority} priority)"
+                )
+        return "\n".join(lines)
 
     def explain_plan(self) -> str:
         """Return a human readable explanation of why the plan looks the way it does."""
@@ -218,9 +294,10 @@ class Scheduler:
         ]
 
         for n, task in enumerate(self.plan, start=1):
+            cited = f" [source: {task.source}]" if task.source else ""
             lines.append(
                 f"  {n}. {task.title} for {task.pet_name} "
-                f"({task.duration_minutes} min, {task.priority} priority)"
+                f"({task.duration_minutes} min, {task.priority} priority){cited}"
             )
 
         if self.skipped:

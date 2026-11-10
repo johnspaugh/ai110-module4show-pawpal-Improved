@@ -1,20 +1,20 @@
 flowchart TD
-    %% Legend: solid boxes exist today, dashed boxes are planned (see Notes_2.txt)
+    %% All components below are implemented. File names are in each box.
 
     User([Pet owner])
 
     subgraph INPUT["INPUT"]
-        Request["Plain-English request<br/>e.g. 90 min, senior dog + cat"]
+        Request["Owner notes (plain English)<br/>e.g. Biscuit takes arthritis medicine<br/>(app.py text box)"]
         Forms["Streamlit forms: owner, pet, task<br/>validates HH:MM start time<br/>(app.py)"]
     end
 
     subgraph PROCESS["PROCESS"]
         direction TB
-        Agent["Planning agent<br/>plan, act, check, retry (max N)"]
-        Retriever["Retriever (RAG)<br/>keyword search over care guides"]
-        KB[("Knowledge base<br/>dog, cat, senior pet, medication<br/>text files")]
-        LLM["LLM call<br/>strict JSON output"]
-        Validator["Output validator<br/>schema, priority, minutes, HH:MM"]
+        Agent["Planning agent (agent.py)<br/>plan, retrieve, act, check, retry (max 3)"]
+        Retriever["Retriever, RAG (rag.py)<br/>keyword search, species filter,<br/>notes matched per pet"]
+        KB[("Knowledge base (knowledge/)<br/>dog, cat, senior pets, medication,<br/>other pets")]
+        LLM["LLM call (llm.py)<br/>live Anthropic model, or demo stand-in<br/>when no API key; strict JSON output"]
+        Validator["Output validator (agent.py)<br/>schema, priority, minutes, HH:MM,<br/>source must be a retrieved guide"]
 
         subgraph CORE["Core logic (pawpal_system.py)"]
             Owner["Owner"]
@@ -23,19 +23,19 @@ flowchart TD
             Scheduler["Scheduler<br/>generate_daily_plan, detect_conflicts,<br/>sort_by_time, filter_tasks"]
         end
 
-        Evaluator["Evaluator (self-check)<br/>time budget, conflicts,<br/>essential tasks not skipped"]
-        Log[("pawpal.log<br/>every step, tool call, retry")]
+        Evaluator["Evaluator, self-check (agent.py)<br/>time budget, overlaps,<br/>essential tasks not skipped<br/>runs on a sandbox copy of the owner"]
+        Log[("pawpal.log (logging_setup.py)<br/>every step, tool call, retry")]
     end
 
     subgraph OUTPUT["OUTPUT"]
-        Preview["Proposed plan preview<br/>+ conflict warnings<br/>+ Why this plan? with cited sources"]
-        Saved["Saved plan in<br/>st.session_state"]
+        Preview["Proposed plan preview<br/>+ checker problems<br/>+ Why this plan? with cited sources"]
+        Saved["Accepted tasks added to the Owner<br/>(kept in st.session_state)"]
     end
 
     subgraph CHECKS["HUMAN AND TEST CHECKS"]
         Human{{"Human review<br/>owner accepts or rejects"}}
-        Tests["Automated tests (pytest)<br/>retrieval, validation,<br/>agent loop with a fake model"]
-        Fallback["Fallback: non-AI scheduling<br/>if no API key or model error"]
+        Tests["Automated tests (pytest)<br/>retrieval, validation, agent loop<br/>with a fake model, app flow"]
+        Fallback["Fallback: non-AI scheduling<br/>if the model call fails"]
     end
 
     User --> Request
@@ -68,7 +68,7 @@ flowchart TD
     Human -->|reject| Request
     Saved --> User
 
-    LLM -.->|error or no key| Fallback
+    LLM -.->|model error| Fallback
     Fallback --> Scheduler
 
     Tests -.->|verifies| Retriever
@@ -76,5 +76,3 @@ flowchart TD
     Tests -.->|verifies| Agent
     Tests -.->|verifies| Scheduler
 
-    classDef planned stroke-dasharray: 5 5
-    class Agent,Retriever,KB,LLM,Validator,Evaluator,Log,Fallback planned
