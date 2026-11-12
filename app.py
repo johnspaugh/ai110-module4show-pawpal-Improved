@@ -1,7 +1,7 @@
 import re
 
 import streamlit as st
-from agent import PlanningAgent, commit_proposal, confidence_label
+from agent import MAX_NOTES_CHARS, PlanningAgent, commit_proposal, confidence_label
 from llm import get_llm
 from logging_setup import setup_logging
 from pawpal_system import Owner, Pet, Task, Scheduler
@@ -156,18 +156,26 @@ if "llm" not in st.session_state:
     st.session_state.llm = get_llm()
 llm = st.session_state.llm
 if llm.mode == "live":
-    st.caption(f"Live model: {llm.model}. Suggestions come from retrieved pet-care guidance.")
+    st.caption(f"Live model: {llm.provider} / {llm.model}. "
+               "Suggestions come from retrieved pet-care guidance.")
 else:
     st.caption(
         "Demo mode (no ANTHROPIC_API_KEY set): a rule-based stand-in reads the same "
         "retrieved guidance. Add a key to use the live model."
     )
 
+st.warning(
+    "General pet-care guidance, not veterinary advice. For medication, use only the doses "
+    "and times your vet gave you; the assistant never decides a dose.",
+    icon="🩺",
+)
+
 if st.session_state.get("flash"):
     st.success(st.session_state.pop("flash"))
 
 notes = st.text_area(
     "Notes for the assistant (optional)",
+    max_chars=MAX_NOTES_CHARS,
     placeholder="e.g. Biscuit takes arthritis medicine every morning. Keep walks gentle.",
 )
 if st.button("Generate AI plan", disabled=not owner.pets):

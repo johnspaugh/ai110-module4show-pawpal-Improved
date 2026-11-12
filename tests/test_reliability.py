@@ -240,3 +240,36 @@ def test_every_agent_scenario_passes(retriever):
 def test_demo_proposals_are_consistent_across_runs(retriever):
     same, runs = evaluate.consistency_eval(retriever, runs=5)
     assert same and runs == 5
+
+
+def test_app_shows_a_not_veterinary_advice_warning_next_to_the_assistant(monkeypatch):
+    pytest.importorskip("streamlit")
+    from streamlit.testing.v1 import AppTest
+
+    monkeypatch.setenv("PAWPAL_DEMO", "1")
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.session_state["owner"] = owner_with(("Biscuit", "dog", 10))
+    at.run()
+
+    assert not at.exception
+    assert any("not veterinary advice" in w.value for w in at.warning)
+    assert any("never decides a dose" in w.value for w in at.warning)
+
+
+def test_a_medication_note_never_produces_a_dose_anywhere_in_the_output(retriever):
+    owner = owner_with(("Biscuit", "dog", 10), ("Mochi", "cat", 5))
+    result = PlanningAgent(owner, DemoLLM(), retriever).run("Biscuit takes arthritis medicine every morning.")
+    everything = (result.explanation + " " + " ".join(t.title for t in result.tasks)).lower()
+
+    assert any("medication" in t.title.lower() for t in result.tasks)  # the task is there
+    for word in (" mg", "dose", "milligram", "tablet", "ml "):
+        assert word not in everything
+
+
+def test_tests_cannot_see_the_developers_real_key_or_env_file():
+    import os
+
+    from llm import get_llm
+
+    assert not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("PAWPAL_DEMO")
+    assert get_llm().mode == "demo"  # holds even if a real key sits in .env on this machine

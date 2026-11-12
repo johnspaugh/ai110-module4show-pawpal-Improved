@@ -31,6 +31,7 @@ logger = logging.getLogger("pawpal.agent")
 
 MAX_ITERATIONS = 3
 MAX_TASKS = 30
+MAX_NOTES_CHARS = 1000  # owner notes go into the prompt; cap them to limit cost and prompt stuffing
 VALID_FREQUENCIES = set(RECURRENCE_DAYS) | {"once"}
 HHMM = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
@@ -93,12 +94,18 @@ def parse_reply(text: str) -> dict:
 
 
 def validate_proposal(
-    data: dict, pet_names: Set[str], allowed_sources: Set[str]
+    data: dict,
+    pet_names: Set[str],
+    allowed_sources: Set[str],
+    allowed_titles: Optional[Dict[str, Set[str]]] = None,
 ) -> Tuple[List[ProposedTask], List[str]]:
     """Check a parsed reply against the rules; return (tasks, errors).
 
     All-or-nothing: if any task is invalid, no tasks are returned, so a bad
-    reply can never change the owner.
+    reply can never change the owner. When allowed_titles is given (guidance
+    label -> lowercase task titles in that guide), a task's title must be one
+    of the tasks in the guide it cites, so the model cannot cite a real guide
+    and still write its own instruction as the title.
     """
     items = data.get("tasks")
     if not isinstance(items, list):
@@ -139,6 +146,12 @@ def validate_proposal(
             errors.append(f"{where}: essential must be true or false")
         if source not in allowed_sources:
             errors.append(f"{where}: source {source!r} is not one of the retrieved guidance labels")
+        elif (allowed_titles is not None and isinstance(title, str)
+              and title.strip().lower() not in allowed_titles.get(source, set())):
+            errors.append(
+                f"{where}: title {title!r} is not a task in the guidance {source!r}; "
+                f"use the exact title of one of its tasks"
+            )
         if errors and errors[-1].startswith(where):
             continue
         key = (pet, title.strip().lower())
@@ -238,6 +251,11 @@ class PlanningAgent:
             result.trace.append(message)
             logger.info(message)
 
+        if len(notes) > MAX_NOTES_CHARS:
+            step(f"GUARD: owner notes were {len(notes)} characters; only the first "
+                 f"{MAX_NOTES_CHARS} are used")
+            notes = notes[:MAX_NOTES_CHARS]
+
         owner = self.owner
         if not owner.pets:
             result.problems = ["Add at least one pet first."]
@@ -257,6 +275,7 @@ class PlanningAgent:
         # RETRIEVE -----------------------------------------------------------
         pet_blocks: List[Dict] = []
         allowed_sources: Set[str] = set()
+        allowed_titles: Dict[str, Set[str]] = {}
         for pet in owner.pets:
             query = build_query(pet.species, pet.age)
             pet_notes = notes_for_pet(notes, pet.name, [p.name for p in owner.pets])
@@ -264,6 +283,8 @@ class PlanningAgent:
                               species=pet.species, notes=pet_notes)
             result.guidance[pet.name] = [(c.label, score) for c, score in hits]
             allowed_sources.update(c.label for c, _ in hits)
+            for c, _ in hits:
+                allowed_titles[c.label] = {t["title"].lower() for t in c.task_suggestions()}
             if hits:
                 step(f"RETRIEVE: {pet.name} ({pet.species}, {pet.age}) -> "
                      + ", ".join(c.label for c, _ in hits))
@@ -306,7 +327,7 @@ class PlanningAgent:
             try:
                 data = parse_reply(reply)
                 tasks, errors = validate_proposal(
-                    data, {p.name for p in owner.pets}, allowed_sources
+                    data, {p.name for p in owner.pets}, allowed_sources, allowed_titles
                 )
             except ValueError as exc:
                 tasks, errors, data = [], [str(exc)], {}

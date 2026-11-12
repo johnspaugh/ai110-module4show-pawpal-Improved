@@ -1,13 +1,20 @@
 """Logging for PawPal+: every agent step, tool call and retry goes to pawpal.log and the console."""
 
 import logging
+import os
 from pathlib import Path
+from typing import Optional
 
 LOG_FILE = Path(__file__).resolve().parent / "pawpal.log"
 
 
-def setup_logging(level: int = logging.INFO, log_file: Path = LOG_FILE) -> logging.Logger:
-    """Configure the "pawpal" logger once and return it. Safe to call on every Streamlit rerun."""
+def setup_logging(level: int = logging.INFO, log_file: Optional[Path] = None) -> logging.Logger:
+    """Configure the "pawpal" logger once and return it. Safe to call on every Streamlit rerun.
+
+    The file is log_file if given, else $PAWPAL_LOG_FILE (the tests point this at a temp file so
+    they never write into the real pawpal.log), else pawpal.log next to this file.
+    """
+    log_file = log_file or Path(os.getenv("PAWPAL_LOG_FILE") or LOG_FILE)
     logger = logging.getLogger("pawpal")
     if logger.handlers:
         return logger
