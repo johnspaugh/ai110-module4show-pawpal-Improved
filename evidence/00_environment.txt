@@ -1,0 +1,14 @@
+generated: 2026-11-13 18:14:12 (local time)
+python: 3.13.1 on Windows 11
+streamlit: 1.67.0
+pytest: 9.2.0
+google-genai: 3.2.0
+anthropic: 2.7.0
+python-dotenv: 1.2.4
+git commit: 18528dd (uncommitted changes present)
+
+To reproduce everything in this folder:
+  python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+  pip install -r requirements.txt
+  python make_evidence.py            # demo mode, no key needed
+  python make_evidence.py --live     # adds the live-model run (needs GEMINI_API_KEY or ANTHROPIC_API_KEY)

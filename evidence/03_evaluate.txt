@@ -1,0 +1,46 @@
+$ python evaluate.py
+# purpose: Labeled retrieval accuracy, 12 agent scenarios, consistency
+# extra environment: PAWPAL_DEMO=1
+# run at: 2026-11-13 18:14:12 (local time)
+# exit code: 0
+
+### Retrieval accuracy (labeled set)
+
+| Test Input | Expected guides | Returned | Result |
+|---|---|---|---|
+| senior dog (age 10) | dog_care.md: Senior dogs, senior_pets.md: Senior pets | dog_care.md: Senior dogs, senior_pets.md: Senior pets | Pass |
+| adult dog (age 3) | dog_care.md: Adult dogs | dog_care.md: Adult dogs | Pass |
+| puppy (age 0) | dog_care.md: Puppies | dog_care.md: Puppies | Pass |
+| adult cat (age 5) | cat_care.md: Adult cats | cat_care.md: Adult cats | Pass |
+| senior cat (age 12) | cat_care.md: Senior cats, senior_pets.md: Senior pets | cat_care.md: Senior cats, senior_pets.md: Senior pets | Pass |
+| kitten (age 0) | cat_care.md: Kittens | cat_care.md: Kittens | Pass |
+| small pet (rabbit-type) | other_pets.md: Small and other pets | other_pets.md: Small and other pets | Pass |
+| adult dog + 'flea pills' | dog_care.md: Adult dogs, medication_basics.md: Medication | dog_care.md: Adult dogs, medication_basics.md: Medication | Pass |
+| senior dog + 'arthritis medicine' | dog_care.md: Senior dogs, medication_basics.md: Medication, senior_pets.md: Senior pets | dog_care.md: Senior dogs, medication_basics.md: Medication, senior_pets.md: Senior pets | Pass |
+| adult dog + common words only | dog_care.md: Adult dogs | dog_care.md: Adult dogs | Pass |
+| species not covered (fish) | (none) | (none) | Pass |
+| species typed 'Dog' (capital) | dog_care.md: Adult dogs | dog_care.md: Adult dogs | Pass |
+| adult cat + 'insulin shots' | cat_care.md: Adult cats | cat_care.md: Adult cats | Pass |
+
+Retrieval: 13 of 13 exact matches; 0 wrong-species results.
+
+### Agent scenarios
+
+| Test Input | Evaluation Criteria | Result | Detail |
+|---|---|---|---|
+| 2 pets + medicine note (demo model) | converges in <= 2 attempts; every task cites a retrieved guide | Pass | 11 tasks, 2 attempt(s), confidence 0.85 |
+| model overlaps two tasks, then fixes it | checker catches overlap, retry converges | Pass | 2 attempt(s) |
+| model never fixes the overlap | stops at the iteration limit and reports it | Pass | stopped after 3 calls, 1 problem(s) reported |
+| model replies with prose, not JSON | rejected, retried, recovers | Pass | 2 calls |
+| model cites a source that was never retrieved | first reply rejected as ungrounded | Pass | 2 attempt(s) |
+| model call raises an error | falls back to normal scheduling, no crash | Pass | fallback plan used, confidence 0.00 |
+| pet with no guidance (fish) | model is never called, nothing invented | Pass | model calls: 0 |
+| whitespace-only notes | handled like no notes | Pass | 10 tasks |
+| two pets with the same name | refused with a clear message (was: silently proposed 0 tasks) | Pass | Two pets share the same name. Rename one so tasks can be ass |
+| run() before the owner accepts | real owner is not changed | Pass | owner has 0 tasks after run() |
+| owner accepts the same proposal twice | tasks added once (was: duplicated) | Pass | 6 tasks after 2 accepts |
+| task from 23:30 for 90 minutes | end time wraps to 01:00 (was: 25:00) | Pass | 23:30 + 90 min -> 01:00 |
+
+Agent scenarios: 12 of 12 passed.
+
+Consistency: 10 identical requests produced the same proposal every time (demo model; the live model is not deterministic).

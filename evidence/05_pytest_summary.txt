@@ -1,0 +1,6 @@
+tests/test_ai_layer.py        53 of  53 passed
+tests/test_pawpal.py          58 of  58 passed
+tests/test_providers.py       24 of  24 passed
+tests/test_reliability.py     29 of  29 passed
+
+164 tests: 164 passed, 0 failed, 0 skipped (counted from pytest's XML report)

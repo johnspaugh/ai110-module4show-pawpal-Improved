@@ -1,0 +1,57 @@
+$ python main.py
+# purpose: Scheduling core demo: plan, sort, filter, recurrence, conflicts
+# extra environment: (none)
+# run at: 2026-11-13 18:14:12 (local time)
+# exit code: 0
+
+====================================================
+  Today's Schedule for Sally
+  Pets: Robert, Mochi
+  Time used: 75 of 90 min
+====================================================
+#  Pet      Task               Min  Priority Repeats
+----------------------------------------------------
+1  Robert   Heartworm pill       5  high     daily
+2  Mochi    Flea medication      5  high     monthly
+3  Mochi    Feeding             10  high     daily
+4  Robert   Morning walk        30  high     daily
+5  Mochi    Playtime            20  medium   daily
+6  Mochi    Brushing             5  low      daily
+----------------------------------------------------
+Skipped (not enough time):
+  - Robert: Grooming (45 min, low)
+
+Plan for Sally: 75 of 90 minutes used.
+Tasks are ordered by priority (high first), then shortest first, and added while they still fit.
+  1. Heartworm pill for Robert (5 min, high priority)
+  2. Flea medication for Mochi (5 min, high priority)
+  3. Feeding for Mochi (10 min, high priority)
+  4. Morning walk for Robert (30 min, high priority)
+  5. Playtime for Mochi (20 min, medium priority)
+  6. Brushing for Mochi (5 min, low priority)
+Skipped (not enough time left):
+  - Grooming for Robert (45 min, low priority)
+
+Sorted by time:
+  07:30  Mochi: Playtime
+  08:00  Robert: Morning walk
+  08:00  Robert: Heartworm pill
+  08:15  Mochi: Feeding
+  08:15  Mochi: Brushing
+  17:00  Robert: Grooming
+  --:--  Mochi: Flea medication
+
+Mochi's tasks only:
+  Feeding
+  Brushing
+  Playtime
+  Flea medication
+
+Completed 'Grooming'; next one due 2026-11-20
+Pending after completion: 7
+
+Conflict check:
+  Conflict (same pet): Robert's Morning walk (08:00-08:30) overlaps Robert's Heartworm pill (08:00-08:05)
+  Conflict (different pets): Robert's Morning walk (08:00-08:30) overlaps Mochi's Feeding (08:15-08:25)
+  Conflict (different pets): Robert's Morning walk (08:00-08:30) overlaps Mochi's Brushing (08:15-08:20)
+  Conflict (same pet): Mochi's Feeding (08:15-08:25) overlaps Mochi's Brushing (08:15-08:20)

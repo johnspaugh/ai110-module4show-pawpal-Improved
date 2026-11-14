@@ -1,0 +1,110 @@
+$ python agent_demo.py
+# purpose: AI agent on the demo model: retrieve, propose, check, retry, explain
+# extra environment: PAWPAL_DEMO=1
+# run at: 2026-11-13 18:14:12 (local time)
+# exit code: 0
+
+Owner notes: Biscuit takes arthritis medicine every morning. Keep walks gentle.
+
+Model mode: demo   attempts: 2   checks passed: True   confidence: 0.85 (high)
+
+What the agent did:
+  - PLAN: 2 pet(s), 90 min/day, model mode=demo
+  - RETRIEVE: Biscuit (dog, 10) -> senior_pets.md: Senior pets, dog_care.md: Senior dogs, medication_basics.md: Medication
+  - RETRIEVE: Mochi (cat, 5) -> cat_care.md: Adult cats
+  - VALIDATE (attempt 1): accepted 11 task(s)
+  - CHECK (attempt 1): 1 problem(s): Biscuit's Feeding (08:00-08:10) overlaps Mochi's Feeding (08:00-08:10)
+  - RETRY: sending the problems back to the model
+  - VALIDATE (attempt 2): accepted 11 task(s)
+  - CHECK (attempt 2): passed (time budget, essential tasks, no overlaps)
+
+Proposed tasks:
+  07:30  Biscuit: Gentle morning walk (15 min, high)  [dog_care.md: Senior dogs]
+  08:00  Biscuit: Feeding (10 min, high)  [dog_care.md: Senior dogs]
+  08:10  Mochi: Feeding (10 min, high)  [cat_care.md: Adult cats]
+  08:20  Biscuit: Give prescribed medication (5 min, high)  [medication_basics.md: Medication]
+  08:30  Mochi: Litter box cleaning (10 min, high)  [cat_care.md: Adult cats]
+  18:00  Biscuit: Gentle evening walk (15 min, medium)  [dog_care.md: Senior dogs]
+  18:30  Mochi: Interactive play (15 min, medium)  [cat_care.md: Adult cats]
+  19:30  Biscuit: Joint comfort check (5 min, medium)  [dog_care.md: Senior dogs]
+  19:35  Mochi: Brushing (5 min, low)  [cat_care.md: Adult cats]
+  20:00  Biscuit: Comfort and mobility check (5 min, medium)  [senior_pets.md: Senior pets]
+  20:30  Biscuit: Fresh water and bed check (5 min, medium)  [senior_pets.md: Senior pets]
+
+Why this plan?
+Plan for Sally: 90 of 90 minutes used.
+The list is in time order. Tasks were chosen by priority (high first), then shortest first, and added while they still fit in the day.
+
+07:30-07:45  Biscuit: Gentle morning walk (15 min)
+    Why: high priority; essential, so it should not be skipped; suggested by guide [1]
+08:00-08:10  Biscuit: Feeding (10 min)
+    Why: high priority; essential, so it should not be skipped; suggested by guide [1]
+08:10-08:20  Mochi: Feeding (10 min)
+    Why: high priority; essential, so it should not be skipped; suggested by guide [2]
+08:20-08:25  Biscuit: Give prescribed medication (5 min)
+    Why: high priority; essential, so it should not be skipped; suggested by guide [3]
+08:30-08:40  Mochi: Litter box cleaning (10 min)
+    Why: high priority; essential, so it should not be skipped; suggested by guide [2]
+12:00-12:10  Mochi: Vet visit reminder (10 min)
+    Why: medium priority; a task you added yourself
+18:00-18:15  Biscuit: Gentle evening walk (15 min)
+    Why: medium priority; suggested by guide [1]
+19:30-19:35  Biscuit: Joint comfort check (5 min)
+    Why: medium priority; suggested by guide [1]
+20:00-20:05  Biscuit: Comfort and mobility check (5 min)
+    Why: medium priority; suggested by guide [4]
+20:30-20:35  Biscuit: Fresh water and bed check (5 min)
+    Why: medium priority; suggested by guide [4]
+
+What the guides say:
+  [1] dog_care.md: Senior dogs: "Senior dogs (about 8 years and older) usually do better with shorter, gentler walks spread across the day, and with extra attention to joints and weight."
+  [2] cat_care.md: Adult cats: "Healthy adult cats (about 2 to 9 years old) need daily meals, a clean litter box, and play to stay active."
+  [3] medication_basics.md: Medication: "Medicine, pills and other prescribed treatments (for example arthritis medicine, heartworm pills or flea medication) must follow the vet's instructions exactly."
+  [4] senior_pets.md: Senior pets: "Older pets of any species (a senior dog, senior cat or other older animal) benefit from a short daily comfort check: how they move, whether they eat and drink normally, and whether their bed is easy to reach."
+
+Left out because there was not enough time left:
+  - Mochi: Interactive play (15 min, medium priority)
+  - Mochi: Brushing (5 min, low priority)
+
+--- stderr (log lines and warnings) ---
+2026-11-13 18:14:12,662 INFO pawpal.llm: using demo model (forced)
+2026-11-13 18:14:12,665 INFO pawpal.rag: loaded 9 knowledge chunks from C:\Users\Lenovo PC\Documents\2026_Fall\AI_110_Foundations_of_AI_Engineering\codePratice\ai110-module4show-pawpal-Improved\knowledge
+2026-11-13 18:14:12,665 INFO pawpal.agent: PLAN: 2 pet(s), 90 min/day, model mode=demo
+2026-11-13 18:14:12,666 INFO pawpal.agent: tool=retrieve_guidance args=['dog senior older']
+2026-11-13 18:14:12,666 INFO pawpal.rag: retrieve query='dog senior older' notes='Biscuit takes arthritis medicine every morning. Keep walks gentle.' species=dog -> [('senior_pets.md: Senior pets', 11.611), ('dog_care.md: Senior dogs', 10.852), ('medication_basics.md: Medication', 9.393)]
+2026-11-13 18:14:12,666 INFO pawpal.agent: RETRIEVE: Biscuit (dog, 10) -> senior_pets.md: Senior pets, dog_care.md: Senior dogs, medication_basics.md: Medication
+2026-11-13 18:14:12,666 INFO pawpal.agent: tool=retrieve_guidance args=['cat adult']
+2026-11-13 18:14:12,666 INFO pawpal.rag: retrieve query='cat adult' notes='Keep walks gentle.' species=cat -> [('cat_care.md: Adult cats', 10.733)]
+2026-11-13 18:14:12,666 INFO pawpal.agent: RETRIEVE: Mochi (cat, 5) -> cat_care.md: Adult cats
+2026-11-13 18:14:12,666 INFO pawpal.agent: tool=llm.complete args=['You are the planning step of PawPal+, a pet care planner.\n\nY', 'OWNER MINUTES AVAILABLE PER DAY: 90\nMINUTES ALREADY COMMITTE']
+2026-11-13 18:14:12,667 INFO pawpal.agent: VALIDATE (attempt 1): accepted 11 task(s)
+2026-11-13 18:14:12,667 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,667 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,667 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,667 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,667 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,667 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,667 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,667 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,667 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,668 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,668 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,668 INFO pawpal.agent: tool=generate_daily_plan args=[]
+2026-11-13 18:14:12,668 INFO pawpal.agent: CHECK (attempt 1): 1 problem(s): Biscuit's Feeding (08:00-08:10) overlaps Mochi's Feeding (08:00-08:10)
+2026-11-13 18:14:12,668 INFO pawpal.agent: RETRY: sending the problems back to the model
+2026-11-13 18:14:12,668 INFO pawpal.agent: tool=llm.complete args=['You are the planning step of PawPal+, a pet care planner.\n\nY', 'OWNER MINUTES AVAILABLE PER DAY: 90\nMINUTES ALREADY COMMITTE']
+2026-11-13 18:14:12,668 INFO pawpal.agent: VALIDATE (attempt 2): accepted 11 task(s)
+2026-11-13 18:14:12,668 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,668 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,668 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,669 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,669 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,669 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,669 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,669 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,669 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,669 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,669 INFO pawpal.agent: tool=add_task args=[]
+2026-11-13 18:14:12,669 INFO pawpal.agent: tool=generate_daily_plan args=[]
+2026-11-13 18:14:12,669 INFO pawpal.agent: CHECK (attempt 2): passed (time budget, essential tasks, no overlaps)
+2026-11-13 18:14:12,669 INFO pawpal.agent: agent finished: attempts=2 converged=True fallback=False confidence=0.85 (high)

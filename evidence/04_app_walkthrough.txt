@@ -1,0 +1,89 @@
+$ python app_walkthrough.py
+# purpose: The real Streamlit app driven headlessly: medication note, 30-minute day, species other
+# extra environment: PAWPAL_DEMO=1
+# run at: 2026-11-13 18:14:12 (local time)
+# exit code: 0
+
+
+===== A. Medication note (120 min) =====
+confidence 0.85 | attempts 2 | checks passed True | fallback False
+on-screen messages:
+  [success] Proposed 11 task(s) after 2 attempt(s). The agent's own checks passed: time budget, essential tasks, no overlaps.
+  [warning] General pet-care guidance, not veterinary advice. For medication, use only the doses and times your vet gave you; the assistant never decides a dose.
+  [info] No tasks yet. Add one above.
+trace:
+  - PLAN: 2 pet(s), 120 min/day, model mode=demo
+  - RETRIEVE: Biscuit (dog, 10) -> senior_pets.md: Senior pets, dog_care.md: Senior dogs, medication_basics.md: Medication
+  - RETRIEVE: Mochi (cat, 5) -> cat_care.md: Adult cats
+  - VALIDATE (attempt 1): accepted 11 task(s)
+  - CHECK (attempt 1): 2 problem(s): Biscuit's Feeding (08:00-08:10) overlaps Mochi's Feeding (08:00-08:10); Biscuit's Joint comfort check (19:30-19:35) overlaps Mochi's Brushing (19:30-19:35)
+  - RETRY: sending the problems back to the model
+  - VALIDATE (attempt 2): accepted 11 task(s)
+  - CHECK (attempt 2): passed (time budget, essential tasks, no overlaps)
+proposed tasks:
+  07:30 Biscuit: Gentle morning walk (15 min, high, essential)
+  08:00 Biscuit: Feeding (10 min, high, essential)
+  08:10 Mochi: Feeding (10 min, high, essential)
+  08:20 Biscuit: Give prescribed medication (5 min, high, essential)
+  08:30 Mochi: Litter box cleaning (10 min, high, essential)
+  18:00 Biscuit: Gentle evening walk (15 min, medium)
+  18:30 Mochi: Interactive play (15 min, medium)
+  19:30 Biscuit: Joint comfort check (5 min, medium)
+  19:35 Mochi: Brushing (5 min, low)
+  20:00 Biscuit: Comfort and mobility check (5 min, medium)
+  20:30 Biscuit: Fresh water and bed check (5 min, medium)
+medication tasks: [('Biscuit', 'Give prescribed medication')]
+'dose' or 'mg' appears in any task or explanation: False
+--- explanation excerpt ---
+Plan for Jordan: 100 of 120 minutes used.
+The list is in time order. Tasks were chosen by priority (high first), then shortest first, and added while they still fit in the day.
+
+07:30-07:45  Biscuit: Gentle morning walk (15 min)
+    Why: high priority; essential, so it should not be skipped; suggested by guide [1]
+08:00-08:10  Biscuit: Feeding (10 min)
+
+===== B. 30-minute day, no notes =====
+confidence 0.40 | attempts 3 | checks passed False | fallback False
+on-screen messages:
+  [warning] General pet-care guidance, not veterinary advice. For medication, use only the doses and times your vet gave you; the assistant never decides a dose.
+  [warning] Proposed 4 task(s), but the checks still found problems after 3 attempt(s). Review them before accepting.
+  [warning] Biscuit's Gentle morning walk (15 min) did not fit in the 30-minute day
+  [warning] The essential tasks alone need 45 minutes but the day has 30. Raise the daily minutes to at least 45, or remove an essential task.
+  [info] No tasks yet. Add one above.
+  [info] Would not fit in the day: Biscuit's Gentle morning walk (15 min)
+trace:
+  - PLAN: 2 pet(s), 30 min/day, model mode=demo
+  - RETRIEVE: Biscuit (dog, 10) -> senior_pets.md: Senior pets, dog_care.md: Senior dogs
+  - RETRIEVE: Mochi (cat, 5) -> cat_care.md: Adult cats
+  - VALIDATE (attempt 1): accepted 10 task(s)
+  - CHECK (attempt 1): 3 problem(s): Biscuit's Gentle morning walk (15 min) did not fit in the 30-minute day; The essential tasks alone need 45 minutes but the day has 30. Raise the daily minutes to at least 45, or remove an essential task.; Biscuit's Feeding (08:00-08:10) overlaps Mochi's Feeding (08:00-08:10)
+  - RETRY: sending the problems back to the model
+  - VALIDATE (attempt 2): accepted 4 task(s)
+  - CHECK (attempt 2): 2 problem(s): Biscuit's Gentle morning walk (15 min) did not fit in the 30-minute day; The essential tasks alone need 45 minutes but the day has 30. Raise the daily minutes to at least 45, or remove an essential task.
+  - RETRY: sending the problems back to the model
+  - VALIDATE (attempt 3): accepted 4 task(s)
+  - CHECK (attempt 3): 2 problem(s): Biscuit's Gentle morning walk (15 min) did not fit in the 30-minute day; The essential tasks alone need 45 minutes but the day has 30. Raise the daily minutes to at least 45, or remove an essential task.
+  - STOP: reached 3 attempt(s) with unresolved problems; showing the last proposal for the owner to review
+proposed tasks:
+  07:30 Biscuit: Gentle morning walk (15 min, high, essential)
+  08:00 Biscuit: Feeding (10 min, high, essential)
+  08:10 Mochi: Feeding (10 min, high, essential)
+  08:30 Mochi: Litter box cleaning (10 min, high, essential)
+would not fit: Biscuit's Gentle morning walk
+problems: ["SKIPPED_ESSENTIAL: Biscuit's Gentle morning walk (15 min) did not fit in the 30-minute day", 'NEEDS_MORE_TIME: The essential tasks alone need 45 minutes but the day has 30. Raise the daily minutes to at least 45, or remove an essential task.']
+plan (what fits): ['Biscuit: Feeding', 'Mochi: Feeding', 'Mochi: Litter box cleaning']
+
+===== C. Species 'other' (the only non-dog/cat choice the app offers) =====
+confidence 1.00 | attempts 1 | checks passed True | fallback False
+on-screen messages:
+  [success] Proposed 2 task(s) after 1 attempt(s). The agent's own checks passed: time budget, essential tasks, no overlaps.
+  [warning] General pet-care guidance, not veterinary advice. For medication, use only the doses and times your vet gave you; the assistant never decides a dose.
+  [info] No tasks yet. Add one above.
+trace:
+  - PLAN: 1 pet(s), 120 min/day, model mode=demo
+  - RETRIEVE: Bubbles (other, 2) -> other_pets.md: Small and other pets
+  - VALIDATE (attempt 1): accepted 2 task(s)
+  - CHECK (attempt 1): passed (time budget, essential tasks, no overlaps)
+proposed tasks:
+  08:00 Bubbles: Daily check, food and fresh water (10 min, high, essential)
+  17:00 Bubbles: Habitat cleaning (15 min, medium)
